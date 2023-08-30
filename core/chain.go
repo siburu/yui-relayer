@@ -11,6 +11,7 @@ import (
 	conntypes "github.com/cosmos/ibc-go/v7/modules/core/03-connection/types"
 	chantypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
 	ibcexported "github.com/cosmos/ibc-go/v7/modules/core/exported"
+	"github.com/hyperledger-labs/yui-relayer/log"
 )
 
 // ProvableChain represents a chain that is supported by the relayer
@@ -194,4 +195,13 @@ func (qc queryContext) Context() context.Context {
 // Height returns a height of the target chain for querying a state
 func (qc queryContext) Height() ibcexported.Height {
 	return qc.height
+}
+
+func GetChainLogger(relayLogger *log.RelayLogger, src, dst *ProvableChain) *log.RelayLogger {
+	return relayLogger.
+		WithChain(
+			src.ChainID(),
+			dst.ChainID(),
+		).
+		WithModule("core.chain")
 }

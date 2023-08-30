@@ -1,8 +1,8 @@
 package core
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	retry "github.com/avast/retry-go"
@@ -10,6 +10,7 @@ import (
 	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 	conntypes "github.com/cosmos/ibc-go/v7/modules/core/03-connection/types"
 	ibcexported "github.com/cosmos/ibc-go/v7/modules/core/exported"
+	"github.com/hyperledger-labs/yui-relayer/log"
 )
 
 var (
@@ -20,12 +21,17 @@ var (
 )
 
 func CreateConnection(src, dst *ProvableChain, to time.Duration) error {
+	logger := GetConnectionLogger(log.GetLogger(), src, dst)
 	ticker := time.NewTicker(to)
 
 	failed := 0
 	for ; true; <-ticker.C {
 		connSteps, err := createConnectionStep(src, dst)
 		if err != nil {
+			logger.Error(
+				"failed to create connection step",
+				err,
+			)
 			return err
 		}
 
@@ -39,9 +45,9 @@ func CreateConnection(src, dst *ProvableChain, to time.Duration) error {
 		// In the case of success and this being the last transaction
 		// debug logging, log created connection and break
 		case connSteps.Success() && connSteps.Last:
-			log.Printf("★ Connection created: [%s]client{%s}conn{%s} -> [%s]client{%s}conn{%s}",
-				src.ChainID(), src.Path().ClientID, src.Path().ConnectionID,
-				dst.ChainID(), dst.Path().ClientID, dst.Path().ConnectionID)
+			logger.Info(
+				"★ Connection created",
+			)
 			return nil
 		// In the case of success, reset the failures counter
 		case connSteps.Success():
@@ -50,12 +56,17 @@ func CreateConnection(src, dst *ProvableChain, to time.Duration) error {
 		// In the case of failure, increment the failures counter and exit if this is the 3rd failure
 		case !connSteps.Success():
 			failed++
-			log.Println("retrying transaction...")
+			logger.Info("retrying transaction...")
 			time.Sleep(5 * time.Second)
 			if failed > 2 {
+				logger.Error(
+					"! Connection failed",
+					errors.New("failed 3 times"),
+				)
 				return fmt.Errorf("! Connection failed: [%s]client{%s}conn{%s} -> [%s]client{%s}conn{%s}",
 					src.ChainID(), src.Path().ClientID, src.Path().ConnectionID,
-					dst.ChainID(), dst.Path().ClientID, dst.Path().ConnectionID)
+					dst.ChainID(), dst.Path().ClientID, dst.Path().ConnectionID,
+				)
 			}
 		}
 
@@ -206,22 +217,25 @@ func validatePaths(src, dst Chain) error {
 }
 
 func logConnectionStates(src, dst Chain, srcConn, dstConn *conntypes.QueryConnectionResponse) {
-	log.Printf("- [%s]@{%d}conn(%s)-{%s} : [%s]@{%d}conn(%s)-{%s}",
-		src.ChainID(),
-		mustGetHeight(srcConn.ProofHeight),
-		src.Path().ConnectionID,
-		srcConn.Connection.State,
-		dst.ChainID(),
-		mustGetHeight(dstConn.ProofHeight),
-		dst.Path().ConnectionID,
-		dstConn.Connection.State,
+	logger := GetConnectionLogger(log.GetLogger(), src.(*ProvableChain), dst.(*ProvableChain))
+	logger.Info(
+		"connection states",
+		"src ProofHeight", mustGetHeight(srcConn.ProofHeight),
+		"src State", srcConn.Connection.State.String(),
+		"dts ProofHeight", mustGetHeight(dstConn.ProofHeight),
+		"dst State", dstConn.Connection.State.String(),
 	)
 }
 
 // mustGetHeight takes the height inteface and returns the actual height
 func mustGetHeight(h ibcexported.Height) uint64 {
+	relayLogger := log.GetLogger()
 	height, ok := h.(clienttypes.Height)
 	if !ok {
+		relayLogger.Error(
+			"height is not an instance of height! wtf",
+			fmt.Errorf("height is not an instance of height! wtf"),
+		)
 		panic("height is not an instance of height! wtf")
 	}
 	return height.GetRevisionHeight()
@@ -230,9 +244,27 @@ func mustGetHeight(h ibcexported.Height) uint64 {
 func mustGetAddress(chain interface {
 	GetAddress() (sdk.AccAddress, error)
 }) sdk.AccAddress {
+	relayLogger := log.GetLogger()
 	addr, err := chain.GetAddress()
 	if err != nil {
+		relayLogger.Error(
+			"failed to get address",
+			err,
+		)
 		panic(err)
 	}
 	return addr
+}
+
+func GetConnectionLogger(relayLogger *log.RelayLogger, src, dst *ProvableChain) *log.RelayLogger {
+	return relayLogger.
+		WithConnection(
+			src.ChainID(),
+			src.Path().ClientID,
+			src.Path().ConnectionID,
+			dst.ChainID(),
+			dst.Path().ClientID,
+			dst.Path().ConnectionID,
+		).
+		WithModule("core.connection")
 }

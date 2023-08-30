@@ -7,6 +7,7 @@ import (
 
 	"github.com/hyperledger-labs/yui-relayer/config"
 	"github.com/hyperledger-labs/yui-relayer/core"
+	"github.com/hyperledger-labs/yui-relayer/log"
 
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/spf13/cobra"
@@ -73,7 +74,13 @@ func Execute(modules ...config.ModuleI) error {
 		if err := viper.BindPFlags(cmd.Flags()); err != nil {
 			return err
 		}
-		return initConfig(ctx, rootCmd)
+		if err := initConfig(ctx, rootCmd); err != nil {
+			return err
+		}
+		if err := initLogger(ctx); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	return rootCmd.Execute()
@@ -83,4 +90,15 @@ func Execute(modules ...config.ModuleI) error {
 func readStdin() (string, error) {
 	str, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	return strings.TrimSpace(str), err
+}
+
+func initLogger(ctx *config.Context) error {
+	loggerConfig := ctx.Config.Global.LoggerConfig
+	level := loggerConfig.Level
+	format := loggerConfig.Format
+	output := loggerConfig.Output
+	if level == "" || format == "" || output == "" {
+		return nil
+	}
+	return log.InitLogger(level, format, output)
 }
