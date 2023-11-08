@@ -35,6 +35,13 @@ type ProverConfig interface {
 	Validate() error
 }
 
+// SignerConfig defines a signer configuration and its builder
+type SignerConfig interface {
+	proto.Message
+	Build() (Signer, error)
+	Validate() error
+}
+
 // NewChainProverConfig returns a new config instance
 func NewChainProverConfig(m codec.JSONCodec, chain ChainConfig, client ProverConfig) (*ChainProverConfig, error) {
 	logger := log.GetLogger().WithModule("core.config")

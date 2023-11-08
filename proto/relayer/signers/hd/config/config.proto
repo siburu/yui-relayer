@@ -1,0 +1,20 @@
+syntax = "proto3";
+package relayer.signers.hd.config;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/hyperledger-labs/yui-relayer/signers/hd";
+option (gogoproto.goproto_getters_all) = false;
+
+message SignerConfig {
+  string mnemonic = 1;
+  Path path = 2;
+}
+
+message Path {
+  uint32 purpose = 1;
+  uint32 coin_type = 2;
+  uint32 account = 3;
+  uint32 change = 4;
+  uint32 address_index = 5;
+}
