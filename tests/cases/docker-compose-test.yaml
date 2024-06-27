@@ -20,6 +20,8 @@ services:
       retries: 5
     networks:
       - *network-common
+    environment:
+      UPGRADE_TRY_VERSION: mockapp-2
   tendermint-chain1: &tendermint-chain1
     container_name: tendermint-chain1
     image: tendermint-chain1:${TAG}
@@ -35,6 +37,8 @@ services:
       retries: 5
     networks:
       - *network-common
+    environment:
+      UPGRADE_TRY_VERSION: mockapp-3
   tendermint-chain0-mock:
     <<: *tendermint-chain0
     container_name: tendermint-chain0-mock
